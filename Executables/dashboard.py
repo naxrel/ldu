@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QSpacerItem, QSizePolicy, QListWidget
 )
 from PySide6.QtGui import QFont, QPixmap
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QTimer
 from utils import get_resource_path
 
 # [REVISI UI 4.0]
@@ -41,6 +41,10 @@ class DashboardPage(QWidget):
         # -------------------------------------------
         
         self.init_ui()
+        
+        self.contact_poll_timer = QTimer(self)
+        self.contact_poll_timer.setInterval(5000) # 5000 ms = 5 detik (LEBIH BAIK)
+        self.contact_poll_timer.timeout.connect(self.load_contact_list)
 
     def init_ui(self):
         """
@@ -208,7 +212,7 @@ class DashboardPage(QWidget):
             pressed=self.COLOR_RED_PRESSED,
             radius=10
         ))
-        self.logout_btn.clicked.connect(self.logout_callback)
+        self.logout_btn.clicked.connect(self.handle_logout)
 
         # --- Susun Widget di Panel Kanan ---
         right_layout.addWidget(header_card)       # [Request #1]
@@ -290,6 +294,17 @@ class DashboardPage(QWidget):
         self.subtitle_label.setText("Selamat datang kembali di dashboard Anda.")
         self.current_user = username
         self.load_contact_list()
+        
+        if not self.contact_poll_timer.isActive():
+            self.contact_poll_timer.start()
+
+
+    def handle_logout(self):
+        """Menghentikan timer sebelum memanggil logout callback."""
+        if self.contact_poll_timer.isActive():
+            self.contact_poll_timer.stop()
+            print("Dashboard: Polling kontak dihentikan.")
+        self.logout_callback()
 
     def load_contact_list(self):
         if not self.current_user: return
@@ -303,13 +318,20 @@ class DashboardPage(QWidget):
         else:
             self.contact_list.addItem("Gagal memuat kontak.")
 
-    def on_contact_clicked(self, item):
+    def on_contact_clicked(self, item): 
         recipient = item.text()
         if recipient.startswith("Memuat") or recipient.startswith("Gagal") or recipient.startswith("Belum"):
             return
+
+    # [BARU] Hentikan timer sebelum pindah
+        if self.contact_poll_timer.isActive():
+            self.contact_poll_timer.stop()
+            print("Dashboard: Polling kontak dihentikan.")
+
         users = sorted([self.current_user, recipient])
-        shared_password = f"key_rahasia_{users[0]}_{users[1]}" 
+        shared_password = f"key_rahasia_{users[0]}_{users[1]}"
         self.switch_to_chat(recipient, shared_password)
+
 
     def handle_start_chat(self):
         recipient = self.recipient_input.text().strip()
@@ -317,6 +339,11 @@ class DashboardPage(QWidget):
             QMessageBox.warning(self, "Error", "Isi username tujuan."); return
         if recipient == self.current_user:
             QMessageBox.warning(self, "Error", "Tidak bisa chat dengan diri sendiri."); return
+        
+        # [BARU] Hentikan timer sebelum pindah
+        if self.contact_poll_timer.isActive():
+            self.contact_poll_timer.stop()
+            print("Dashboard: Polling kontak dihentikan.")
         
         users = sorted([self.current_user, recipient])
         shared_password = f"key_rahasia_{users[0]}_{users[1]}"
